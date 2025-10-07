@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GOMATO App Interface - Multi-Service</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', sans-serif; background-color: #f0f4f8; }
+        /* Brand */
+        .color-primary { background-color: #38761D; }
+        .color-accent { background-color: #FF9900; }
+        .text-primary { color: #38761D; }
+        .text-accent { color: #FF9900; }
+        .card-shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+
+        /* Typography scale */
+        html { font-size: 15px; }
+
+        /* Interactions */
+        .smooth { transition: all 200ms ease-out; }
+        .smooth:hover { transform: translateY(-1px); }
+        .tap:active { transform: translateY(1px); }
+
+        /* Tabs */
+        .service-tab { transition: all .3s ease; cursor: pointer; border-bottom: 3px solid transparent; }
+        .service-tab.active { font-weight: 700; color: #38761D; border-bottom-color: #FF9900; }
+
+        /* Spinner */
+        .loading-spinner { border: 4px solid rgba(255,255,255,.3); border-top: 4px solid #fff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+
+        /* Images */
+        .pre-order-card-bg { background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.8)), url('https://placehold.co/380x180/38761D/FFFFFF?text=Pre-Order'); background-size: cover; background-position: center; }
+
+        /* Modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 50; }
+        .modal-content { background: #fff; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,.3); }
+
+        /* Service tiles */
+        .service-tile { width: 100%; height: 140px; border-radius: 12px; display: flex; flex-direction: column; justify-content: space-between; padding: 1rem; cursor: pointer; color: #fff; transition: transform .2s; box-shadow: 0 6px 15px rgba(0,0,0,.15); }
+        .service-tile h3 { font-size: 1.4rem; font-weight: 800; }
+        .service-tile p { font-size: .85rem; }
+        .cpg-tile { background-color: #3B82F6; }
+
+        /* Sticky search */
+        .search-wrap { position: sticky; top: 0; z-index: 20; backdrop-filter: saturate(180%) blur(8px); background: rgba(255,255,255,.85); }
+        .search-input { border:1px solid #e5e7eb; border-radius: 9999px; padding:.6rem .9rem; font-size:.9rem; }
+        .search-input:focus { outline:none; box-shadow: 0 0 0 2px rgba(255,153,0,.35); border-color:#FF9900; }
+
+        /* Chips */
+        .icon-chip { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .75rem; border-radius:9999px; background:#f9fafb; border:1px solid #eef2f7; font-weight:600; font-size:.8rem; }
+
+        /* Bottom sheets (slot + cart) */
+        .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display:none; z-index:60; }
+        .sheet { position: fixed; left:0; right:0; bottom:0; background:#fff; border-top-left-radius:16px; border-top-right-radius:16px; box-shadow:0 -8px 24px rgba(0,0,0,.15); transform: translateY(100%); transition: transform 240ms cubic-bezier(.2,.8,.2,1); z-index:61; }
+        .sheet.open { transform: translateY(0%); }
+        .sheet-handle { width:40px; height:4px; border-radius:2px; background:#E5E7EB; margin:8px auto; }
+
+        /* FAB */
+        .fab { position: fixed; right: 38.25rem; bottom: 1.25rem; z-index: 70; }
+        .fab-btn { width:56px; height:56px; border-radius:9999px; box-shadow: 0 10px 24px rgba(0,0,0,.22); }
+        .badge { position:absolute; top:-6px; right:-6px; min-width:20px; height:20px; border-radius:9999px; background:#FF9900; color:#fff; font-weight:700; font-size:.7rem; display:flex; align-items:center; justify-content:center; padding:0 .25rem; }
+
+        .cart-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display:none; z-index:75; }
+        .cart-sheet { position: fixed; left:0; right:0; bottom:0; background:#fff; border-top-left-radius:16px; border-top-right-radius:16px; box-shadow:0 -8px 24px rgba(0,0,0,.15); transform: translateY(100%); transition: transform 240ms cubic-bezier(.2,.8,.2,1); z-index:76; }
+        .cart-sheet.open { transform: translateY(0%); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Nutrition Modal -->
+    <div id="nutrition-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold text-primary mb-3" id="modal-title">Nutrition Analysis</h3>
+            <div id="modal-body" class="text-sm text-gray-700 space-y-2"><p>Loading analysis...</p></div>
+            <button onclick="closeModal()" class="w-full mt-5 bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition duration-150 hover:bg-gray-400">Close</button>
+        </div>
+    </div>
+
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-2xl overflow-hidden min-h-screen">
+        <!-- Header -->
+        <header class="p-4 color-primary shadow-md flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <button class="text-white tap" aria-label="Home" onclick="switchContent('home')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                </button>
+                <div class="text-white text-2xl font-extrabold">G</div>
+                <h1 class="text-white text-lg font-bold tracking-wider">GOMATO</h1>
+            </div>
+            <div class="text-white text-xs font-medium"><span id="user-location">Bangalore, HSR Layout</span></div>
+        </header>
+
+        <!-- Sticky Search -->
+        <div class="search-wrap px-4 pt-3 pb-2 border-b border-gray-100">
+            <label class="sr-only" for="global-search">Search dishes and chefs</label>
+            <div class="flex items-center gap-2">
+                <div class="flex-1 bg-white search-input flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400 mr-2" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM4 9.5C4 6.47 6.47 4 9.5 4S15 6.47 15 9.5 12.53 15 9.5 15 4 12.53 4 9.5z"/></svg>
+                    <input id="global-search" type="search" placeholder="Search ‘paneer’, ‘roti sabzi’, ‘Lavanya’…" class="flex-1 bg-transparent" oninput="liveSearch(this.value)" />
+                </div>
+                <button class="icon-chip tap" onclick="clearSearch()">✖️ Clear</button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div id="service-tabs" class="flex justify-around p-4 border-b border-gray-100 sticky top-0 bg-white z-10 hidden">
+            <div id="tab-order-now" class="service-tab pb-2 text-gray-500 text-sm sm:text-base" data-service="order-now">ORDER NOW</div>
+            <div id="tab-subscription" class="service-tab pb-2 text-gray-500 text-sm sm:text-base" data-service="subscription">SUBSCRIPTION</div>
+            <div id="tab-pre-order" class="service-tab pb-2 text-gray-500 text-sm sm:text-base" data-service="pre-order">PRE-ORDER</div>
+        </div>
+
+        <!-- Content -->
+        <main id="content-container" class="p-4 space-y-6">
+            <!-- HOME -->
+            <section id="home-page-content" class="service-content">
+                <h2 class="text-xl font-extrabold text-primary mb-3">What are you craving today?</h2>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="icon-chip smooth">🍛 Thalis</span>
+                    <span class="icon-chip smooth">🥗 Healthy</span>
+                    <span class="icon-chip smooth">🌶️ Spicy</span>
+                    <span class="icon-chip smooth">🥟 Regional</span>
+                    <span class="icon-chip smooth">🫓 Roti-Sabzi</span>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="service-tile color-accent smooth" style="background-image:linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),url('./Punjabi-Thali.jpg'); background-size: cover;" onclick="switchContent('order-now')">
+                        <h3 class="leading-none">ORDER NOW</h3>
+                        <p>Fast, home-cooked delivery.</p>
+                        <svg class="w-10 h-10 self-end" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3L2 12h3v8h5z"/></svg>
+                    </div>
+                    <div class="service-tile color-primary smooth" style="background-image:linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),url('./subscription.jpg'); background-size: cover;" onclick="switchContent('subscription')">
+                        <h3 class="leading-none">SUBSCRIPTION</h3>
+                        <p>Weekly/Monthly AI-powered plans.</p>
+                        <svg class="w-10 h-10 self-end" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <div class="service-tile bg-gray-600 smooth" style="background-image:linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),url('./pre-order.jpg'); background-size: cover;" onclick="switchContent('pre-order')">
+                        <h3 class="leading-none">PRE-ORDER</h3>
+                        <p>Feasts & specialty dishes.</p>
+                        <svg class="w-10 h-10 self-end" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h2v-5h16v5h2v-6c0-1.66-1.34-3-3-3zM7 11V9h2v2H7zm4 0V9h2v2h-2zm4 0V9h2v2h-2zM4 19h16v2H4z"/></svg>
+                    </div>
+                    <div class="service-tile cpg-tile smooth" style="background-image:linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),url('./packaged.jpg'); background-size: cover;" onclick="alert('Navigating to Traditional Pantry Store...')">
+                        <h3 class="leading-none">GOMATO SHOP</h3>
+                        <p>Home chef spices & pickles.</p>
+                        <svg class="w-10 h-10 self-end" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v10c1.1 0 2 .9 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM10 4h4v2h-4V4zM20 18H4V8h16v10zM9 13H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ORDER NOW -->
+            <section id="order-now-content" class="service-content hidden">
+                <h2 class="text-xl font-bold text-primary mb-3">Today's Home Meals</h2>
+                <p class="text-gray-600 mb-4 text-sm font-semibold text-accent">Craving Ghar Ka Khana? Get Verified Home Chefs Delivered in Minutes.</p>
+                <div class="space-y-4">
+                    <div class="flex items-center bg-white rounded-lg card-shadow overflow-hidden">
+                        <div class="w-1/3 h-32" style="background-image:url('./south-indian-comfort.jpg');background-size:cover;background-position:center;border-radius: 10px; margin-left: 10px;"></div>
+                        <div class="p-3 w-2/3">
+                            <h3 class="font-bold text-lg">South Indian Comfort Thali</h3>
+                            <p class="text-sm text-gray-600 truncate mb-1">⭐ SuperChef Verified | Traditional Karnataka Meal</p>
+                            <button onclick="analyzeNutrition('South Indian Comfort Thali','Traditional Karnataka Meal with Sambar, Rice, and Curries')" class="text-xs text-primary font-semibold hover:text-accent flex items-center">Nutrition Breakdown ✨</button>
+                            <p class="text-xl font-extrabold text-accent mt-1">₹ 249</p>
+                            <button class="w-full mt-2 color-accent text-white font-bold py-2 px-4 rounded-full transition duration-150 hover:bg-orange-600">Order Now (28 Min)</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center bg-white rounded-lg card-shadow overflow-hidden">
+                        <div class="w-1/3 h-32" style="background-image:url('./Punjabi-Thali.jpg');background-size:cover;background-position:center;border-radius: 10px; margin-left: 10px;"></div>
+                        <div class="p-3 w-2/3">
+                            <h3 class="font-bold text-lg">Authentic Punjabi Veg Thali</h3>
+                            <p class="text-sm text-gray-600 truncate mb-1">FSSAI Certified | Chhole, Paneer & Roti</p>
+                            <button onclick="analyzeNutrition('Authentic Punjabi Veg Thali','Homemade Chhole, low-oil Paneer Curry, two whole wheat rotis, and rice.')" class="text-xs text-primary font-semibold hover:text-accent flex items-center">Nutrition Breakdown ✨</button>
+                            <p class="text-xl font-extrabold text-accent mt-1">₹ 229</p>
+                            <button class="w-full mt-2 color-accent text-white font-bold py-2 px-4 rounded-full transition duration-150 hover:bg-orange-600">Order Now (32 Min)</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SUBSCRIPTION -->
+            <section id="subscription-content" class="service-content hidden">
+                <h2 class="text-xl font-bold text-primary mb-3">Personalized Meal Plans</h2>
+                <p class="text-gray-600 mb-4 text-sm">Save big! Choose weekly/monthly plans or customize your own below.</p>
+                <div class="color-primary p-4 rounded-xl shadow-lg mb-6">
+                    <h3 class="font-bold text-lg text-white mb-2 flex items-center">Dietary Customizer ✨ (AI Powered)</h3>
+                    <p class="text-green-200 text-xs mb-3">Tell us your goals, allergies, and cuisine preference.</p>
+                    <textarea id="diet-query" rows="3" class="w-full p-2 rounded-lg text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-accent" placeholder="E.g., 'Low-carb, high-protein; allergic to peanuts' — generate plan"></textarea>
+                    <button id="generate-plan-btn" class="w-full mt-3 color-accent text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center transition duration-150 hover:bg-orange-600" onclick="generateCustomPlan()"><span id="btn-text">Generate My Plan Suggestion</span><div id="loader" class="hidden loading-spinner ml-3"></div></button>
+                </div>
+                <div id="ai-response-area" class="space-y-4 hidden">
+                    <h3 class="font-bold text-lg text-primary mb-3">Recommended Plans:</h3>
+                    <div id="plan-result" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+                    <div id="ai-message-card" class="bg-white p-4 rounded-lg card-shadow border-l-4 border-accent text-sm text-gray-700 hidden"></div>
+                </div>
+                <h3 class="font-bold text-lg text-primary mt-6 mb-3">Top Home Chef Subscription Picks</h3>
+                <div class="space-y-4">
+                    <div class="bg-white rounded-lg p-4 card-shadow border-l-4 border-accent">
+                        <h3 class="font-extrabold text-lg text-primary">Micro-Meals Pass</h3>
+                        <p class="text-gray-600 text-sm mb-2">5 Meal Credits. Use Any Day. Flexible Scheduling.</p>
+                        <p class="text-2xl font-extrabold text-accent">₹ 999 <span class="text-sm text-gray-400 line-through">₹ 1250</span></p>
+                        <button class="w-full mt-3 color-accent text-white font-bold py-2 px-4 rounded-lg transition duration-150 hover:bg-orange-600">View Plan Details</button>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-4 card-shadow border-l-4 border-primary">
+                        <h3 class="font-extrabold text-lg text-primary">GOMATO CIRCLE (Unlimited)</h3>
+                        <p class="text-gray-600 text-sm mb-2">Free Delivery + 1.5x Masala Points on all orders.</p>
+                        <p class="text-2xl font-extrabold text-primary">₹ 99 <span class="text-sm font-normal text-gray-500">/ Month</span></p>
+                        <button class="w-full mt-3 color-primary text-white font-bold py-2 px-4 rounded-lg transition duration-150 hover:bg-green-700">Join Circle Now</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PRE-ORDER -->
+            <section id="pre-order-content" class="service-content hidden">
+                <h2 class="text-2xl font-extrabold text-primary mb-2">Relax—Your Chef Has Dinner Covered</h2>
+                <p class="text-gray-600 mb-6 text-sm">Fresh meals crafted by trusted local chefs. Schedule your delivery up to 7 days in advance.</p>
+                <div class="space-y-6">
+                    <div class="rounded-xl card-shadow overflow-hidden pre-order-card-bg">
+                        <div class="p-4 text-white">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <img src="https://placehold.co/40x40/FFFFFF/38761D?text=SC" class="rounded-full border-2 border-accent" alt="Chef Avatar" />
+                                <div><p class="font-bold text-lg">Chef Lavanya S.</p></div>
+                            </div>
+                            <h3 class="text-xl font-bold mb-3">Kerala Sadya Feast (Serves 4)</h3>
+                            <p class="text-xs text-gray-200 mb-4">A complete traditional feast including Avial, Olan, and Pappadam. Perfect for weekend gatherings.</p>
+                            <div class="flex justify-between items-center bg-white/20 p-2 rounded-lg">
+                                <div class="text-sm font-semibold"><span class="text-accent">₹ 1199</span> <span class="text-gray-300">| Available: Thu, Fri, Sun</span></div>
+                                <button class="color-accent text-white font-bold py-1 px-3 rounded-full text-xs transition duration-150 hover:bg-orange-600 tap" onclick="openSlotPanel('Kerala Sadya Feast (Serves 4)')">Choose Slot</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-xl card-shadow overflow-hidden pre-order-card-bg" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.8)), url('https://placehold.co/380x180/FF9900/38761D?text=Chef+Special')">
+                        <div class="p-4 text-white">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <img src="https://placehold.co/40x40/FFFFFF/FF9900?text=NC" class="rounded-full border-2 border-accent" alt="Chef Avatar" />
+                                <div><p class="font-bold text-lg">Chef Nitin C.</p></div>
+                            </div>
+                            <h3 class="text-xl font-bold mb-3">Lucknowi Mutton Biryani</h3>
+                            <p class="text-xs text-gray-200 mb-4">Slow-cooked, authentic Awadhi style Biryani, prepared with premium Basmati rice.</p>
+                            <div class="flex justify-between items-center bg-white/20 p-2 rounded-lg">
+                                <div class="text-sm font-semibold"><span class="text-accent">₹ 499</span> <span class="text-gray-300">| Available: Fri, Sat</span></div>
+                                <button class="color-accent text-white font-bold py-1 px-3 rounded-full text-xs transition duration-150 hover:bg-orange-600 tap" onclick="openSlotPanel('Lucknowi Mutton Biryani')">Choose Slot</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- FAB Cart -->
+        <div class="fab">
+            <button class="color-accent text-white fab-btn flex items-center justify-center tap" aria-label="Open cart" onclick="openCart()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM7.16 14.26l.03.01 9.74.73c.66.05 1.25-.36 1.42-1l1.53-5.74a1 1 0 00-.97-1.26H6.21L5.27 3.99H2v2h2.27l2.4 9.02-.39 1.46A2 2 0 008 18h11v-2H8.42l.25-.93.49-.81z"/></svg>
+                <span id="cart-badge" class="badge" style="display:none;">0</span>
+            </button>
+        </div>
+
+        <!-- Cart Sheet -->
+        <div id="cart-backdrop" class="cart-backdrop  max-w-md mx-auto" onclick="closeCart()"></div>
+        <div id="cart-sheet" class="cart-sheet  max-w-md mx-auto">
+            <div class="sheet-handle"></div>
+            <div class="p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-base font-bold text-primary">Your Cart</h3>
+                    <button class="icon-chip tap" onclick="closeCart()">Close</button>
+                </div>
+                <div id="cart-items" class="divide-y divide-gray-100"><p class="text-sm text-gray-500">Cart is empty. Add some ghar‑ka‑khana!</p></div>
+                <div class="flex items-center justify-between pt-2">
+                    <span id="cart-total" class="text-lg font-extrabold text-primary">₹ 0</span>
+                    <button class="color-primary text-white font-bold py-2 px-4 rounded-lg tap" disabled id="checkout-btn">Proceed to Checkout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slot Sheet -->
+        <div id="slot-backdrop" class="sheet-backdrop max-w-md mx-auto" onclick="closeSlotPanel()"></div>
+        <div id="slot-sheet" class="sheet max-w-md mx-auto">
+            <div class="sheet-handle"></div>
+            <div class="p-4">
+                <h3 class="text-base font-bold text-primary mb-2">Choose a delivery slot</h3>
+                <p id="slot-meta" class="text-xs text-gray-500 mb-3">For: <span id="slot-dish">Selected Dish</span></p>
+                <div class="grid grid-cols-3 gap-2 mb-3" id="slot-dates"></div>
+                <div class="grid grid-cols-2 gap-2" id="slot-times">
+                    <button class="border rounded-lg p-2 text-sm smooth" data-time="12:00-14:00" onclick="pickTime(this)">Lunch 12:00–14:00</button>
+                    <button class="border rounded-lg p-2 text-sm smooth" data-time="13:00-15:00" onclick="pickTime(this)">Lunch 13:00–15:00</button>
+                    <button class="border rounded-lg p-2 text-sm smooth" data-time="19:00-21:00" onclick="pickTime(this)">Dinner 19:00–21:00</button>
+                    <button class="border rounded-lg p-2 text-sm smooth" data-time="20:00-22:00" onclick="pickTime(this)">Dinner 20:00–22:00</button>
+                </div>
+                <button id="confirm-slot" class="w-full mt-4 color-accent text-white font-bold py-2 px-4 rounded-lg tap" onclick="confirmSlot()" disabled>Confirm Slot</button>
+                <button class="w-full mt-2 bg-gray-100 text-gray-800 font-semibold py-2 px-4 rounded-lg tap" onclick="closeSlotPanel()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // -------------------- Gemini API helpers --------------------
+        const API_KEY = ""; // Provided by canvas/runtime
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        async function exponentialBackoff(fn, maxRetries = 5, delay = 1000) {
+            for (let i = 0; i < maxRetries; i++) {
+                try { return await fn(); } catch (e) { if (i === maxRetries - 1) throw e; await new Promise(r => setTimeout(r, delay * Math.pow(2, i))); }
+            }
+        }
+        function showModal(title, content) { document.getElementById('modal-title').textContent = title; document.getElementById('modal-body').innerHTML = content; document.getElementById('nutrition-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('nutrition-modal').style.display = 'none'; }
+        async function analyzeNutrition(dishName, dishDescription) {
+            showModal(dishName, '<div class="flex items-center justify-center py-4"><div class="loading-spinner"></div><span class="ml-3 text-primary">Analyzing ingredients...</span></div>');
+            const systemPrompt = `You are the GOMATO Nutrition AI. Provide concise estimates for calories, protein, and fat (per serving). Assess 'homemade health' (low oil, fiber, freshness). Use bold labels. No external search.`;
+            const userQuery = `Analyze this dish: ${dishName}. Description: ${dishDescription}.`;
+            const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+            try {
+                const resp = await exponentialBackoff(() => fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }));
+                if (!resp.ok) throw new Error(resp.statusText);
+                const result = await resp.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not generate analysis.';
+                const formatted = text.replace(/\*\*(.*?)\*\*/g,'<strong>$1<\/strong>').replace(/\n/g,'<br>');
+                document.getElementById('modal-body').innerHTML = formatted;
+            } catch (e) { document.getElementById('modal-body').innerHTML = '<p class="text-red-600">Error: Failed to fetch nutritional data.</p>'; }
+        }
+        // Expose needed functions to inline handlers
+        window.analyzeNutrition = analyzeNutrition; window.closeModal = closeModal;
+
+        // -------------------- Subscription (AI) --------------------
+        function renderPlanCards(plans) {
+            const container = document.getElementById('plan-result'); container.innerHTML = '';
+            const chunks = plans.split('\n\n').filter(p => p.trim()).slice(0,3);
+            if (!chunks.length) {
+                const card = document.getElementById('ai-message-card'); card.classList.remove('hidden'); card.innerHTML = '<p class="font-semibold text-red-600">Could not generate tailored plans. Adjust your prompt.</p>'; return;
+            }
+            const frag = document.createDocumentFragment();
+            chunks.forEach((plan, idx) => {
+                const lines = plan.split('\n').filter(Boolean); if (lines.length < 2) return;
+                const name = lines[0].replace(/Plan \d: /,'').trim();
+                const focus = lines[1].trim();
+                const price = `₹ ${Math.floor(Math.random()*(3500-1800)+1800)}`;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'bg-white rounded-lg p-3 card-shadow border-l-4 border-primary';
+                wrapper.innerHTML = `<img src="https://placehold.co/150x100/38761D/FFFFFF?text=Plan+${idx+1}" alt="Plan Image" class="w-full h-auto object-cover rounded mb-2"/>
+                    <h4 class="font-bold text-md text-primary">${name}</h4>
+                    <p class="text-xs text-gray-600 mt-1">${focus}</p>
+                    <div class="flex justify-between items-center mt-2"><span class="text-xl font-extrabold text-accent">${price}</span><button class="color-accent text-white font-bold py-1 px-3 rounded-lg text-sm hover:bg-orange-600">Select</button></div>`;
+                frag.appendChild(wrapper);
+            });
+            container.appendChild(frag); document.getElementById('ai-message-card').classList.add('hidden');
+        }
+        async function generateCustomPlan() {
+            const query = document.getElementById('diet-query').value; const btn = document.getElementById('generate-plan-btn'); const btnText = document.getElementById('btn-text'); const loader = document.getElementById('loader'); const responseArea = document.getElementById('ai-response-area'); const resultDiv = document.getElementById('plan-result'); const msg = document.getElementById('ai-message-card');
+            if (!query.trim()) { msg.classList.remove('hidden'); msg.innerHTML = '<p class="font-semibold text-red-600">Please enter your dietary requirements to generate a plan.</p>'; return; }
+            btn.disabled = true; btnText.textContent = 'Generating Plan...'; loader.classList.remove('hidden'); responseArea.classList.remove('hidden'); resultDiv.innerHTML = '<p class="text-gray-500 italic p-4 text-center">Analyzing dietary restrictions and generating specialized plans...</p>'; msg.classList.add('hidden');
+            const systemPrompt = `Generate exactly 3 compelling 7-day subscription plan suggestions for Indian homemade cuisine in Bangalore. Format as three paragraphs: Plan Name, focus, and concise description. No bullets, no numbering.`;
+            const userQuery = `User request: ${query}.`;
+            const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+            try {
+                const resp = await exponentialBackoff(() => fetch(API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }));
+                if (!resp.ok) throw new Error(resp.statusText);
+                const result = await resp.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                renderPlanCards(text);
+            } catch (e) { msg.classList.remove('hidden'); msg.innerHTML = '<p class="font-semibold text-red-600">Error generating plan. Please try again.</p>'; }
+            finally { btn.disabled = false; btnText.textContent = 'Generate My Plan Suggestion'; loader.classList.add('hidden'); }
+        }
+        window.generateCustomPlan = generateCustomPlan;
+
+        // -------------------- Navigation --------------------
+        const serviceMap = { 'home':'home-page-content', 'order-now':'order-now-content', 'subscription':'subscription-content', 'pre-order':'pre-order-content' };
+        function updateTabDisplay(active) {
+            const tabsContainer = document.getElementById('service-tabs'); const tabs = document.querySelectorAll('.service-tab');
+            if (active === 'home') { tabsContainer.classList.add('hidden'); } else { tabsContainer.classList.remove('hidden'); }
+            tabs.forEach(t => { t.classList.remove('active','text-primary'); if (t.dataset.service === active) { t.classList.add('active','text-primary'); } });
+        }
+        function switchContent(targetService) {
+            const targetId = serviceMap[targetService]; const sections = document.querySelectorAll('.service-content');
+            sections.forEach(s => s.classList.add('hidden'));
+            const active = document.getElementById(targetId); if (active) { active.classList.remove('hidden'); updateTabDisplay(targetService); }
+        }
+        window.switchContent = switchContent;
+
+        // -------------------- Slot Panel --------------------
+        let pickedDate = null, pickedTime = null;
+        function openSlotPanel(dish) { document.getElementById('slot-dish').textContent = dish || 'Selected Dish'; document.getElementById('slot-backdrop').style.display='block'; document.getElementById('slot-sheet').classList.add('open'); document.getElementById('confirm-slot').disabled=true; pickedDate=null; pickedTime=null; }
+        function closeSlotPanel() { document.getElementById('slot-backdrop').style.display='none'; document.getElementById('slot-sheet').classList.remove('open'); }
+        function buildDates() { const wrap = document.getElementById('slot-dates'); wrap.innerHTML=''; const today = new Date(); for (let i=0;i<7;i++){ const d=new Date(today); d.setDate(today.getDate()+i); const btn=document.createElement('button'); btn.className='border rounded-lg p-2 text-xs smooth'; btn.textContent=d.toLocaleDateString('en-IN',{weekday:'short',month:'short',day:'numeric'}); btn.dataset.date=d.toISOString().split('T')[0]; btn.onclick=()=>pickDate(btn); wrap.appendChild(btn);} }
+        function pickDate(el) { [...document.querySelectorAll('#slot-dates button')].forEach(b=>b.classList.remove('border-primary','text-primary','font-semibold')); el.classList.add('border-primary','text-primary','font-semibold'); pickedDate = el.dataset.date; updateConfirm(); }
+        function pickTime(el) { [...document.querySelectorAll('#slot-times button')].forEach(b=>b.classList.remove('border-primary','text-primary','font-semibold')); el.classList.add('border-primary','text-primary','font-semibold'); pickedTime = el.dataset.time; updateConfirm(); }
+        function updateConfirm(){ const btn=document.getElementById('confirm-slot'); btn.disabled = !(pickedDate && pickedTime); }
+        function confirmSlot(){ closeSlotPanel(); alert(`Slot booked for ${pickedDate} (${pickedTime}).`); }
+        window.openSlotPanel = openSlotPanel; window.closeSlotPanel = closeSlotPanel; window.pickDate = pickDate; window.pickTime = pickTime; window.confirmSlot = confirmSlot;
+
+        // -------------------- Search + Cart --------------------
+        function liveSearch(q){ /* Placeholder for filtering; to be implemented based on data source */ }
+        function clearSearch(){ const i=document.getElementById('global-search'); i.value=''; liveSearch(''); i.focus(); }
+        window.liveSearch = liveSearch; window.clearSearch = clearSearch;
+
+        const cart = { items: [], total: 0 };
+        function addToCart(name, price){ cart.items.push({name, price}); cart.total += price; renderCart(); }
+        function removeItem(i){ cart.total -= cart.items[i].price; cart.items.splice(i,1); renderCart(); }
+        function renderCart(){
+            const list = document.getElementById('cart-items'); const total = document.getElementById('cart-total'); const badge = document.getElementById('cart-badge'); const checkout = document.getElementById('checkout-btn');
+            if(!cart.items.length){ list.innerHTML = '<p class="text-sm text-gray-500">Cart is empty. Add some ghar‑ka‑khana!</p>'; badge.style.display='none'; total.textContent='₹ 0'; checkout.disabled=true; return; }
+            list.innerHTML = cart.items.map((it,idx)=>`<div class="py-2 flex items-center justify-between"><div class="text-sm"><p class="font-semibold">${it.name}</p><p class="text-gray-500">₹ ${it.price}</p></div><button class="text-xs text-red-600" onclick="removeItem(${idx})">Remove</button></div>`).join('');
+            total.textContent = '₹ ' + cart.total; badge.textContent = cart.items.length; badge.style.display='flex'; checkout.disabled=false;
+        }
+        function openCart(){ document.getElementById('cart-backdrop').style.display='block'; document.getElementById('cart-sheet').classList.add('open'); }
+        function closeCart(){ document.getElementById('cart-backdrop').style.display='none'; document.getElementById('cart-sheet').classList.remove('open'); }
+        window.addToCart = addToCart; window.removeItem = removeItem; window.openCart = openCart; window.closeCart = closeCart;
+
+        // -------------------- Boot --------------------
+        document.addEventListener('DOMContentLoaded', () => {
+            // Tabs
+            document.querySelectorAll('.service-tab').forEach(tab => tab.addEventListener('click', e => switchContent(e.currentTarget.dataset.service)));
+            // Default view
+            switchContent('home');
+            // Build slot dates
+            buildDates();
+            // Wire "Order Now" buttons to cart (demo)
+            document.querySelectorAll('#order-now-content button.color-accent').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const card = btn.closest('.flex');
+                    const name = card.querySelector('h3').textContent.trim();
+                    const price = parseInt(card.querySelector('.text-accent').textContent.replace(/[^0-9]/g,''), 10);
+                    addToCart(name, price);
+                });
+            });
+            // Run smoke tests
+            runSmokeTests();
+        });
+
+        // -------------------- Smoke Tests (console) --------------------
+        function runSmokeTests(){
+            const results = [];
+            const test = (name, fn) => { try { fn(); results.push({name, pass:true}); } catch(e){ results.push({name, pass:false, err:e.message}); } };
+            test('switchContent is global', () => { if (typeof window.switchContent !== 'function') throw new Error('not a function'); });
+            test('openSlotPanel is global', () => { if (typeof window.openSlotPanel !== 'function') throw new Error('not a function'); });
+            test('Tab map contains pre-order', () => { if (!serviceMap['pre-order']) throw new Error('missing key'); });
+            test('buildDates created 7 buttons', () => { const n = document.querySelectorAll('#slot-dates button').length; if (n !== 7) throw new Error('expected 7, got '+n); });
+            test('Cart starts empty', () => { const txt=document.getElementById('cart-total').textContent.trim(); if (!/₹\s*0/.test(txt)) throw new Error('total not zero'); });
+            console.groupCollapsed('%cGOMATO UI Smoke Tests','color:#38761D;font-weight:700;');
+            results.forEach(r => console.log(r.pass ? '✅ '+r.name : '❌ '+r.name+' — '+r.err));
+            console.groupEnd();
+        }
+    </script>
+</body>
+</html>
